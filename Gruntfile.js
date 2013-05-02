@@ -3,7 +3,7 @@ module.exports = function(grunt) {
         pkg: grunt.file.readJSON('package.json'),
 
         src: {
-            files: ['src/Options.js', 'src/Utils.js', 'src/Events.js', 'src/Map.js', 'src/Location.js', 'src/Pin.js', 'src/Directions.js', 'src/View.js', 'src/BMaps.js']
+            files: ['src/Options.js', 'src/Utils.js', 'src/Events.js', 'src/Map.js', 'src/Location.js', 'src/Pin.js', 'src/Directions.js', 'src/View.js', 'src/Poi.js', 'src/BMaps.js']
         },
 
         concat: {

@@ -59,7 +59,7 @@ BMaps.Utils = (function() {
 
         JSONPRequest: function JSONPRequest(url, data) {
             var script = document.createElement('script'), k;
-
+            console.log(url, data);
             if(data) url += '?';
 
             for(k in data) url += [k, data[k]].join('=') + '&';
@@ -91,6 +91,60 @@ BMaps.Utils = (function() {
                     };
                 }
             }
+        },
+
+        promise: function(obj, rootCall) {
+
+            function Promise(root, rootFn) {
+                this.overrideProps(root);
+                this.resolutions = [{ scope: root, method: null, args: [] }];
+                return this;
+            }
+
+            Promise.prototype = Object.create({
+                resolve: function() {
+                    var scope = null;
+
+                    for(var p in this.resolutions) {
+                        var reso = this.resolutions[p];
+                        if(!reso.method) continue;
+                        console.log(reso);
+                        reso.scope[reso.method].apply(reso.scope, reso.args);
+                        // else if(scope && reso.method) {
+                        //     scope = scope[reso.method].apply(scope, reso.args);
+                        // }
+
+                        // console.log(reso.scope || scope, reso.method);
+                    }
+                },
+
+                overrideProps: function(obj) {
+                    var self = this;
+
+                    for(var p in obj) {
+                        if(/function/ig.test(typeof obj[p])) {
+                            this[p] = self.nextPromise(obj, p, obj[p], self);
+                        }
+                        else {
+                            this[p] = function() {
+                                return self;
+                            }
+                        }
+                    }
+                },
+
+                nextPromise: function(scope, prop, exp, p) {
+                    return function() {
+                        var newScope = exp.apply(scope, arguments);
+                        p.overrideProps(newScope);
+                        p.resolutions[p.resolutions.length-1].method = prop;
+                        p.resolutions.push({ scope: newScope, method: null, args: arguments });
+                        return p;
+                    }
+                }
+            });
+
+            return new Promise(obj, rootCall);
         }
     });
 

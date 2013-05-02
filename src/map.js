@@ -8,5 +8,9 @@ BMaps.Map = (function() {
         return this;
     }
 
+    BMapsMap.prototype = Object.create({
+        _reference: ['BMapsView']
+    });
+
     return BMapsMap;
 })();

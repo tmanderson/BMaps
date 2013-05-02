@@ -1,5 +1,5 @@
 BMaps.Directions = (function() {
-    function BMapsDirections() {
+    function BMapsDirections(root) {
         this._root = root;
 
         this.map = function() {
@@ -10,18 +10,45 @@ BMaps.Directions = (function() {
     }
 
     BMapsDirections.prototype = Object.create({
-        _mixWith: ['BMapsLocation', 'BMapsPin'],
+        _reference  : ['BMapsLocation', 'BMapsPin', 'BMapsPOI'],
+        _lastDir    : 'to',
+
+        byTransit: function() {
+            this._manager.setRequestOptions({ routeMode: Microsoft.Maps.Directions.RouteMode.transit });
+            this._manager.calculateDirections();
+            return this;
+        },
+
+        byDriving: function() {
+            this._manager.setRequestOptions({ routeMode: Microsoft.Maps.Directions.RouteMode.driving });
+            this._manager.calculateDirections();
+            return this;
+        },
+
+        byWalking: function() {
+            this._manager.setRequestOptions({ routeMode: Microsoft.Maps.Directions.RouteMode.walking });
+            this._manager.calculateDirections();
+            return this;
+        },
 
         to: function(toAddress) {
-            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map());
-            this._manager.addWaypoint({ location: this.location().get() });
-            this._manager.addWaypoint({ address: toAddress });
+            this._lastDir = 'to';
+            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map()._mapInstance);
+            this._manager.resetDirections();
+            this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ location: this.location().current() }));
+            this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ address: toAddress }));
+            this._manager.calculateDirections();
+            return this;
         },
 
         from: function(fromAddress) {
-            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map());
-            this._manager.addWaypoint({ address: fromAddress });
-            this._manager.addWaypoint({ location: this.location().get() });
+            this._lastDir = 'from';
+            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map()._mapInstance);
+            this._manager.resetDirections();
+            this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ address: fromAddress }));
+            this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ location: this.location().current() }));
+            this._manager.calculateDirections();
+            return this;
         }
     });
 

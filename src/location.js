@@ -13,8 +13,7 @@ BMaps.Location = (function() {
     }
 
     BMapsLocation.prototype = Object.create({
-        _mixWith: ['BMapsView', 'BMapsPin', 'BMapsDirections'],
-
+        _reference: ['BMapsView', 'BMapsPin', 'BMapsDirections', 'BMapsPOI'],
         _coords: { lat: 0.0, lon: 0.0 },
 
         current: function() {
@@ -26,12 +25,15 @@ BMaps.Location = (function() {
 
         },
 
-        geolocation: function() {
-            if(navigator.geolocation) {
+        geolocate: function() {
+            if(navigator.geolocation && !this.get().lat && !this.get().lon) {
                 this._gettingLocation = true;
                 navigator.geolocation.getCurrentPosition(
                         BMapsLocation.geolocationSuccessHandler(this), 
                             BMapsLocation.geolocationErrorHandler(this));
+
+                this.promise = BMaps.Utils.promise(this, this.geolocation);
+                return this.promise;
             }
 
             return this;
@@ -50,7 +52,10 @@ BMaps.Location = (function() {
         return function(pos) {
             scope._coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
             scope._gettingLocation = false;
-            BMaps.trigger('location:geolocation', scope);
+            if(scope.promise) {
+                scope.promise.resolve();
+                scope.promise = undefined;
+            }
             return true;
         };
     };

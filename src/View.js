@@ -14,13 +14,19 @@ BMaps.View = (function() {
     }
 
     BMapsView.prototype = Object.create({
-        _mixWith: ['BMapsMap', 'BMapsPin', 'BMapsLocation', 'BMapsDirections'],
+        _reference: ['BMapsMap', 'BMapsPin', 'BMapsLocation', 'BMapsDirections'],
 
         center: function() {
             var location = this.location();
             if(location.get().lat && location.get().lon) {
                 this.map()._mapInstance.setView( defaults({ center: location.current(), zoom: 13 }) );
             }
+            return this;    
+        },
+
+        zoom: function() {
+            this.map()._mapInstance.setView( defaults({ zoom: arguments[0] }) );
+            return this;
         }
     });
 

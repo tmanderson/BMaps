@@ -8,12 +8,10 @@ BMaps.Pin = (function() {
             while(map._root) map = map._root;
             return map;
         };
-
-        if(this._root._location && this._mixWith.indexOf('BMapsLocation')) this._location = this._root._location;
     }
 
     BMapsPin.prototype = Object.create({
-        _mixWith: ['BMapsView', 'BMapsLocation', 'BMapsDirections'],
+        _reference: ['BMapsView', 'BMapsLocation', 'BMapsDirections'],
 
         add: function(options) {
             options = options || {};

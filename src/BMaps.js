@@ -4,30 +4,42 @@ BMaps = (function() {
         BMapsLocation   : BMaps.Location,
         BMapsDirections : BMaps.Directions,
         BMapsMap        : BMaps.Map,
-        BMapsView       : BMaps.View
+        BMapsView       : BMaps.View,
+        BMapsPOI        : BMaps.POI
     };
 
-    function onMixin(to, moduleName) {
-        var shortName = moduleName.match(/BMaps(\w+)/).pop().toLowerCase();
+    Microsoft.Maps.loadModule("Microsoft.Maps.Directions", function() { console.log('ready'); });
 
-        to.prototype[shortName] = function() {
-            if(!this['_' + shortName]) {
-                this['_' + shortName] = new modules[moduleName](this);
-                if(this._mixWith && ~this._mixWith.indexOf(moduleName)) {
-                    var name = to.toString().match(/BMaps(\w+)/).pop().toLowerCase();
-                    this['_' + shortName]['_' + name] = this;
+    function createProperty(referenceName, moduleName, thisConstructorName) {
+        return function() {
+            var instance = this['_' + referenceName];
+
+            if(!instance) instance = this['_' + referenceName] = new modules[moduleName](this);
+            
+            for(var r in instance._reference) {
+                if(thisConstructorName === instance._reference[r]) instance['_' + instance._reference[r]] = this;
+                if(this['_' + instance._reference[r]]) {
+                        instance['_' + instance._reference[r]] = this['_' + instance._reference[r]];
                 }
             }
 
-            return this['_' + shortName];
+            return instance;
         }
+    }
+
+    function getShortName(name) {
+        return name.match(/BMaps(\w+)/).pop().toLowerCase();
     }
 
     for(var c in modules) {
         var module = modules[c];
-        for(var m in module.prototype._mixWith) {
-            var mixTo   = modules[module.prototype._mixWith[m]];
-            onMixin(mixTo, c);
+
+        for(var m in module.prototype._reference) {
+            var canReference    = module.prototype._reference[m],
+                shortName       = getShortName(canReference);
+
+            module.prototype[shortName] = createProperty(shortName, canReference, getShortName(c));
+            module.prototype._reference[m] = shortName;
         }
     }
 

@@ -125,7 +125,7 @@ BMaps.Utils = (function() {
 
         JSONPRequest: function JSONPRequest(url, data) {
             var script = document.createElement('script'), k;
-
+            console.log(url, data);
             if(data) url += '?';
 
             for(k in data) url += [k, data[k]].join('=') + '&';
@@ -157,6 +157,60 @@ BMaps.Utils = (function() {
                     };
                 }
             }
+        },
+
+        promise: function(obj, rootCall) {
+
+            function Promise(root, rootFn) {
+                this.overrideProps(root);
+                this.resolutions = [{ scope: root, method: null, args: [] }];
+                return this;
+            }
+
+            Promise.prototype = Object.create({
+                resolve: function() {
+                    var scope = null;
+
+                    for(var p in this.resolutions) {
+                        var reso = this.resolutions[p];
+                        if(!reso.method) continue;
+                        console.log(reso);
+                        reso.scope[reso.method].apply(reso.scope, reso.args);
+                        // else if(scope && reso.method) {
+                        //     scope = scope[reso.method].apply(scope, reso.args);
+                        // }
+
+                        // console.log(reso.scope || scope, reso.method);
+                    }
+                },
+
+                overrideProps: function(obj) {
+                    var self = this;
+
+                    for(var p in obj) {
+                        if(/function/ig.test(typeof obj[p])) {
+                            this[p] = self.nextPromise(obj, p, obj[p], self);
+                        }
+                        else {
+                            this[p] = function() {
+                                return self;
+                            }
+                        }
+                    }
+                },
+
+                nextPromise: function(scope, prop, exp, p) {
+                    return function() {
+                        var newScope = exp.apply(scope, arguments);
+                        p.overrideProps(newScope);
+                        p.resolutions[p.resolutions.length-1].method = prop;
+                        p.resolutions.push({ scope: newScope, method: null, args: arguments });
+                        return p;
+                    }
+                }
+            });
+
+            return new Promise(obj, rootCall);
         }
     });
 
@@ -243,6 +297,10 @@ BMaps.Map = (function() {
         return this;
     }
 
+    BMapsMap.prototype = Object.create({
+        _reference: ['BMapsView']
+    });
+
     return BMapsMap;
 })();
 BMaps.Location = (function() {
@@ -260,8 +318,7 @@ BMaps.Location = (function() {
     }
 
     BMapsLocation.prototype = Object.create({
-        _mixWith: ['BMapsView', 'BMapsPin', 'BMapsDirections'],
-
+        _reference: ['BMapsView', 'BMapsPin', 'BMapsDirections', 'BMapsPOI'],
         _coords: { lat: 0.0, lon: 0.0 },
 
         current: function() {
@@ -273,12 +330,15 @@ BMaps.Location = (function() {
 
         },
 
-        geolocation: function() {
-            if(navigator.geolocation) {
+        geolocate: function() {
+            if(navigator.geolocation && !this.get().lat && !this.get().lon) {
                 this._gettingLocation = true;
                 navigator.geolocation.getCurrentPosition(
                         BMapsLocation.geolocationSuccessHandler(this), 
                             BMapsLocation.geolocationErrorHandler(this));
+
+                this.promise = BMaps.Utils.promise(this, this.geolocation);
+                return this.promise;
             }
 
             return this;
@@ -297,7 +357,10 @@ BMaps.Location = (function() {
         return function(pos) {
             scope._coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
             scope._gettingLocation = false;
-            BMaps.trigger('location:geolocation', scope);
+            if(scope.promise) {
+                scope.promise.resolve();
+                scope.promise = undefined;
+            }
             return true;
         };
     };
@@ -320,12 +383,10 @@ BMaps.Pin = (function() {
             while(map._root) map = map._root;
             return map;
         };
-
-        if(this._root._location && this._mixWith.indexOf('BMapsLocation')) this._location = this._root._location;
     }
 
     BMapsPin.prototype = Object.create({
-        _mixWith: ['BMapsView', 'BMapsLocation', 'BMapsDirections'],
+        _reference: ['BMapsView', 'BMapsLocation', 'BMapsDirections'],
 
         add: function(options) {
             options = options || {};
@@ -388,7 +449,7 @@ BMaps.Pin = (function() {
     return BMapsPin;
 })();
 BMaps.Directions = (function() {
-    function BMapsDirections() {
+    function BMapsDirections(root) {
         this._root = root;
 
         this.map = function() {
@@ -399,18 +460,45 @@ BMaps.Directions = (function() {
     }
 
     BMapsDirections.prototype = Object.create({
-        _mixWith: ['BMapsLocation', 'BMapsPin'],
+        _reference  : ['BMapsLocation', 'BMapsPin', 'BMapsPOI'],
+        _lastDir    : 'to',
+
+        byTransit: function() {
+            this._manager.setRequestOptions({ routeMode: Microsoft.Maps.Directions.RouteMode.transit });
+            this._manager.calculateDirections();
+            return this;
+        },
+
+        byDriving: function() {
+            this._manager.setRequestOptions({ routeMode: Microsoft.Maps.Directions.RouteMode.driving });
+            this._manager.calculateDirections();
+            return this;
+        },
+
+        byWalking: function() {
+            this._manager.setRequestOptions({ routeMode: Microsoft.Maps.Directions.RouteMode.walking });
+            this._manager.calculateDirections();
+            return this;
+        },
 
         to: function(toAddress) {
-            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map());
-            this._manager.addWaypoint({ location: this.location().get() });
-            this._manager.addWaypoint({ address: toAddress });
+            this._lastDir = 'to';
+            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map()._mapInstance);
+            this._manager.resetDirections();
+            this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ location: this.location().current() }));
+            this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ address: toAddress }));
+            this._manager.calculateDirections();
+            return this;
         },
 
         from: function(fromAddress) {
-            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map());
-            this._manager.addWaypoint({ address: fromAddress });
-            this._manager.addWaypoint({ location: this.location().get() });
+            this._lastDir = 'from';
+            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map()._mapInstance);
+            this._manager.resetDirections();
+            this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ address: fromAddress }));
+            this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ location: this.location().current() }));
+            this._manager.calculateDirections();
+            return this;
         }
     });
 
@@ -432,17 +520,91 @@ BMaps.View = (function() {
     }
 
     BMapsView.prototype = Object.create({
-        _mixWith: ['BMapsMap', 'BMapsPin', 'BMapsLocation', 'BMapsDirections'],
+        _reference: ['BMapsMap', 'BMapsPin', 'BMapsLocation', 'BMapsDirections'],
 
         center: function() {
             var location = this.location();
             if(location.get().lat && location.get().lon) {
                 this.map()._mapInstance.setView( defaults({ center: location.current(), zoom: 13 }) );
             }
+            return this;    
+        },
+
+        zoom: function() {
+            this.map()._mapInstance.setView( defaults({ zoom: arguments[0] }) );
+            return this;
         }
     });
 
     return BMapsView;
+})();
+BMaps.POI = (function() {
+    var JSONPRequest    = BMaps.Utils.JSONPRequest,
+        JSONPHandler    = BMaps.Utils.JSONPHandler;
+
+    function BMapsPOI(root) {
+        this._root = root;
+
+        this.map = function() {
+            var map = this._root;
+            while(map._root) map = map._root;
+            return map;
+        };
+    }
+
+    BMapsPOI.prototype = Object.create({
+        _reference: ['BMapsMap', 'BMapsPin', 'BMapsLocation'],
+        _results: [],
+
+        get: function() {
+            var location = this.location();
+
+            if(location.get().lat && location.get().lon && !this._results.length) {
+                var self    = this,
+                    promise = BMaps.Utils.promise(this);
+
+                BMapsPOI.getPOIs({
+                    lat     : location.get().lat,
+                    lon     : location.get().lon,
+                    callback: function(data) {
+                        self._results = data;
+                        promise.resolve();
+                    }
+                });
+
+                return promise;
+            }
+            else {
+                return this._results;
+            }
+        }
+    });
+
+    BMapsPOI.createRequestURL = function createRequestURL(service) {
+        return 'http://spatial.virtualearth.net/REST/v1/data/' + BMaps.Options.Data[service].urlString;
+    };
+
+    BMapsPOI.spatialFilter = function spatialFilter(lat, lon, range) {
+        return 'nearby(' + lat + ',' + lon + ',' + (range || 15.0) + ')';
+    };
+
+    BMapsPOI.formatResponse = function formatResponse(callback) {
+        return function(data) {
+            results = data.d.results;
+            if(callback) callback(results);
+        };
+    };
+
+    BMapsPOI.getPOIs = function getPOIs(options) {
+        JSONPRequest(BMapsPOI.createRequestURL('NAVTEQNA'), {
+            spatialFilter   : BMapsPOI.spatialFilter(options.lat, options.lon, options.range),
+            jsonp           : JSONPHandler(BMapsPOI.formatResponse(options.callback)),
+            key             : BMaps.key,
+            $format         : 'json'
+        });
+    };
+
+    return BMapsPOI;
 })();
 BMaps = (function() {
     var modules = {
@@ -450,30 +612,42 @@ BMaps = (function() {
         BMapsLocation   : BMaps.Location,
         BMapsDirections : BMaps.Directions,
         BMapsMap        : BMaps.Map,
-        BMapsView       : BMaps.View
+        BMapsView       : BMaps.View,
+        BMapsPOI        : BMaps.POI
     };
 
-    function onMixin(to, moduleName) {
-        var shortName = moduleName.match(/BMaps(\w+)/).pop().toLowerCase();
+    Microsoft.Maps.loadModule("Microsoft.Maps.Directions", function() { console.log('ready'); });
 
-        to.prototype[shortName] = function() {
-            if(!this['_' + shortName]) {
-                this['_' + shortName] = new modules[moduleName](this);
-                if(this._mixWith && ~this._mixWith.indexOf(moduleName)) {
-                    var name = to.toString().match(/BMaps(\w+)/).pop().toLowerCase();
-                    this['_' + shortName]['_' + name] = this;
+    function createProperty(referenceName, moduleName, thisConstructorName) {
+        return function() {
+            var instance = this['_' + referenceName];
+
+            if(!instance) instance = this['_' + referenceName] = new modules[moduleName](this);
+            
+            for(var r in instance._reference) {
+                if(thisConstructorName === instance._reference[r]) instance['_' + instance._reference[r]] = this;
+                if(this['_' + instance._reference[r]]) {
+                        instance['_' + instance._reference[r]] = this['_' + instance._reference[r]];
                 }
             }
 
-            return this['_' + shortName];
+            return instance;
         }
+    }
+
+    function getShortName(name) {
+        return name.match(/BMaps(\w+)/).pop().toLowerCase();
     }
 
     for(var c in modules) {
         var module = modules[c];
-        for(var m in module.prototype._mixWith) {
-            var mixTo   = modules[module.prototype._mixWith[m]];
-            onMixin(mixTo, c);
+
+        for(var m in module.prototype._reference) {
+            var canReference    = module.prototype._reference[m],
+                shortName       = getShortName(canReference);
+
+            module.prototype[shortName] = createProperty(shortName, canReference, getShortName(c));
+            module.prototype._reference[m] = shortName;
         }
     }
 
