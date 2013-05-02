@@ -1,5 +1,6 @@
-BMaps.utils = (function() {
-    return {
+BMaps.Utils = (function() {
+
+    var BMapsUtils = Object.create({
         id: function id() {
             if(!this.count) this.count = 0;
             return ++this.count;
@@ -38,8 +39,8 @@ BMaps.utils = (function() {
             return function() { fn.apply(as, arguments); return as; };
         },
 
-        location: function location(options) {
-            return new Microsoft.Maps.Location(options.lat, options.lon);
+        location: function location(lat, lon) {
+            return new Microsoft.Maps.Location(lat, lon);
         },
 
         JSONPHandler: function JSONPHandler(callback) {
@@ -71,7 +72,7 @@ BMaps.utils = (function() {
 
         allowMixins: function allowMixins(obj) {
             obj.mixin = function(mixin) {
-                for(var k in mixin) obj.prototype[k] = mixin[k];
+                for(var k in mixin) BMap.prototype[k] = mixin[k];
             };
         },
 
@@ -91,5 +92,7 @@ BMaps.utils = (function() {
                 }
             }
         }
-    };
+    });
+
+    return BMapsUtils;
 })();

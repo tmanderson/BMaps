@@ -1,14 +1,16 @@
-BMaps.events = (function() {
-
-    var Events = {
+BMaps.Events = (function() {
+    BMapsEvents = Object.create({
         trigger: function trigger(type) {
             var data    = Array.prototype.slice.apply(arguments),
                 events  = this._events[type],
                 i;
                 
-            for(i = 0; i < events.length; i++) {
-                events[i].callback.apply(events[i].scope || this, data.slice(1));
-                if(events[i].one) this.off(type, events[i].callback, events[i].scope);
+            if(!events) return;
+
+            for(i = 0; i < this._events[type].length; i++) {
+                var evt = this._events[type][i];
+                evt.callback.apply(evt.scope || this, data.slice(1));
+                if(evt.one) this.off(type, evt.callback, evt.scope);
             }
 
             return this;
@@ -16,7 +18,7 @@ BMaps.events = (function() {
 
         on: function on(type, callback, scope) {
             if(!this._events[type]) this._events[type] = [];
-            this._events[type].push({ callback: callback, scope: scope || this, one: callback.one });
+            this._events[type].push({ callback: callback, scope: scope, one: callback.one });
             return this;
         },
 
@@ -57,17 +59,13 @@ BMaps.events = (function() {
 
             return this;
         }
-    };
+    });
 
-    function makeEventable(obj) {
+    BMapsEvents.eventable = function eventable(obj) {
         obj._events = {};
-        for(var k in Events) obj[k] = BMaps.utils.bind(Events[k], obj);
+        for(var k in BMapsEvents) obj[k] = BMapsEvents[k];
         return obj;
     }
 
-    makeEventable(BMaps);
-
-    return {
-        makeEventable: makeEventable
-    };
+    return BMapsEvents;
 })();

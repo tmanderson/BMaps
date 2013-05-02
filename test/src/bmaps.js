@@ -1,11 +1,72 @@
-BMaps = {
-    init: function(options) {
-        BMaps.key = options.key;
-        return BMaps;
+BMaps = {}
+BMaps.Options = Object.create({
+    Map: {
+        backgroundColor     : Microsoft.Maps.Color, //a,r,g,b
+        credentials         : null,
+        customizeOverlays   : false,
+        disableBirdseye     : false,
+        disableKeyboardInput: false,
+        disableMouseInput   : false,
+        disablePanning      : false,
+        disableTouchInput   : false,
+        DisableUserInput    : false,
+        disableZooming      : false,
+        enableClickableLogo : true,
+        enableSearchLogo    : true,
+        fixedMapPosition    : false,
+        height              : null, // must have width as well
+        inertialIntensity   : 0.85,
+        showBreadCrumb      : false,
+        showCopyright       : true,
+        showDashboard       : true,
+        showMapTypeSelector : true,
+        showScalebar        : true,
+        theme               : null, //'Microsoft.Maps.Themes.BingThemes', //   module?
+        tileBuffer          : 0,
+        userIntertia        : true,
+        width               : null
+    },
+
+    MapView: {
+        animate     : true,
+        //  The bounding rectangle of the map view. If both are specified, bounds takes precedence over center.
+        bounds      : false,
+        center      : null,     // Microsoft.Maps.Location,
+        centerOffset: null,     // Microsoft.Maps.Point,
+        heading     : 0,
+        labelOverlay: null,     // Microsoft.Maps.LabelOverlay,
+        mapTypeId   : null,     // Microsoft.Maps.MapTypeId.aerial,
+        padding     : 0,
+        zoom        : 10
+    },
+
+    Data: {
+        FourthCoffeeSample: {},
+        NAVTEQNA: {
+            urlString       : 'f22876ec257b474b82fe2ffcb8393150/NAVTEQNA/NAVTEQPOIs',
+            properties      : {
+                EntityId        : null,
+                Name            : null,
+                DisplayName     : null,
+                Latitude        : null,
+                Longitude       : null,
+                AddressLine     : null,
+                Locality        : null,
+                AdminDistrict   : null,
+                AdminDistrict2  : null,
+                PostalCode      : null,
+                CountryRegion   : null,
+                Phone           : null,
+                EntityTypeId    : null
+            }
+        },
+        NAVTEQEU: {},
+        TrafficIncidents: {}
     }
-};
-BMaps.utils = (function() {
-    return {
+})
+BMaps.Utils = (function() {
+
+    var BMapsUtils = Object.create({
         id: function id() {
             if(!this.count) this.count = 0;
             return ++this.count;
@@ -44,8 +105,8 @@ BMaps.utils = (function() {
             return function() { fn.apply(as, arguments); return as; };
         },
 
-        location: function location(options) {
-            return new Microsoft.Maps.Location(options.lat, options.lon);
+        location: function location(lat, lon) {
+            return new Microsoft.Maps.Location(lat, lon);
         },
 
         JSONPHandler: function JSONPHandler(callback) {
@@ -77,7 +138,7 @@ BMaps.utils = (function() {
 
         allowMixins: function allowMixins(obj) {
             obj.mixin = function(mixin) {
-                for(var k in mixin) obj.prototype[k] = mixin[k];
+                for(var k in mixin) BMap.prototype[k] = mixin[k];
             };
         },
 
@@ -97,19 +158,23 @@ BMaps.utils = (function() {
                 }
             }
         }
-    };
-})();
-BMaps.events = (function() {
+    });
 
-    var Events = {
+    return BMapsUtils;
+})();
+BMaps.Events = (function() {
+    BMapsEvents = Object.create({
         trigger: function trigger(type) {
             var data    = Array.prototype.slice.apply(arguments),
                 events  = this._events[type],
                 i;
                 
-            for(i = 0; i < events.length; i++) {
-                events[i].callback.apply(events[i].scope || this, data.slice(1));
-                if(events[i].one) this.off(type, events[i].callback, events[i].scope);
+            if(!events) return;
+
+            for(i = 0; i < this._events[type].length; i++) {
+                var evt = this._events[type][i];
+                evt.callback.apply(evt.scope || this, data.slice(1));
+                if(evt.one) this.off(type, evt.callback, evt.scope);
             }
 
             return this;
@@ -117,7 +182,7 @@ BMaps.events = (function() {
 
         on: function on(type, callback, scope) {
             if(!this._events[type]) this._events[type] = [];
-            this._events[type].push({ callback: callback, scope: scope || this, one: callback.one });
+            this._events[type].push({ callback: callback, scope: scope, one: callback.one });
             return this;
         },
 
@@ -158,263 +223,261 @@ BMaps.events = (function() {
 
             return this;
         }
-    };
+    });
 
-    function makeEventable(obj) {
+    BMapsEvents.eventable = function eventable(obj) {
         obj._events = {};
-        for(var k in Events) obj[k] = BMaps.utils.bind(Events[k], obj);
+        for(var k in BMapsEvents) obj[k] = BMapsEvents[k];
         return obj;
     }
 
-    makeEventable(BMaps);
-
-    return {
-        makeEventable: makeEventable
-    };
+    return BMapsEvents;
 })();
-BMaps.modules = (function() {
-    var modules = {
-        shapes      : { cls: 'Microsoft.Maps.AdvancedShapes' }, 
-        directions  : { cls: 'Microsoft.Maps.Directions' },
-        search      : { cls: 'Microsoft.Maps.Search' },
-        themes      : { cls: 'Microsoft.Maps.Themes.BingTheme' },
-        traffic     : { cls: 'Microsoft.Maps.Traffic' },
-        venues      : { cls: 'Microsoft.Maps.VenueMaps' }
-    };
-
-    for(var m in modules) {
-        modules[m].requested = false;
-        modules[m].loaded = false;
-    }
-
-    function moduleLoaded(name, callback) {
-        return function() {
-            modules[name].loaded = true;
-
-            BMaps.trigger('modules:loaded', name, modules[name]);
-            if(callback) callback(name, modules[name]);
-        };
-    }
-
-    function requestModule(name, callback) {
-        modules[name].requested = true;
-        Microsoft.Maps.loadModule(modules[name].cls, {callback: moduleLoaded(name, callback) });
-    }
-
-    function loadModule(name, callback) {
-        if(!modules[name]) return;
-        requestModule(name, callback);
-    }
-
-    function isModuleLoaded(name) {
-        return modules[name].requested && modules[name].loaded;
-    }
-
-    function getModule(name, callback) {
-        if(!isModuleLoaded(name)) {
-            loadModule(name, callback);
-            return false;
-        } 
-        else {
-            return modules[name];
-        }
-    }
-
-    return {
-        load        : loadModule,
-        get         : getModule
-    };
-
-})();
-/**
- * Maps Module for BMaps
- */
-BMaps.map = (function() {
-    var BMap, BMapView,
-        defaults    = BMaps.utils.defaults,
-        merge       = BMaps.utils.merge,
-        mixin       = BMaps.utils.allowMixins;
-
-    function BMap(options) {
-        options = options || {};
+BMaps.Map = (function() {
+    function BMapsMap() {
+        var defaults = BMaps.Utils.defaults;
+        options = arguments[1] || {};
         if(!options.key) options.credentials = BMaps.key;
-        console.log(options.key)
-        this.map = new Microsoft.Maps.Map(options.el || document.body, defaults(options, BMapOptions) );
+        this._mapInstance = new Microsoft.Maps.Map(options.el || document.body, defaults(options, BMaps.Options.Map, true));
+
         return this;
-    };
+    }
 
-    BMap.prototype = Object.create({
-        view    : function(options) { 
-            if(!options) return this.map.getView();
-            this.view = defaults(options, BMapView);
-            this.map.setView( this.view );
-        }
-    });
-
-    mixin(BMap);
-
-    BMapView = Object.create({
-        //  A boolean that specifies whether to animate map navigation. Note that this option is 
-        //  associated with each setView call and defaults to true if not specified.
-        /**
-         * A boolean that specifies whether to animate map navigation. Note that this option is 
-         * associated with each setView call and defaults to true if not specified.
-         * @type {Boolean}
-         */
-        animate     : true,
-        //  The bounding rectangle of the map view. If both are specified, bounds takes precedence over center.
-        bounds      : false,
-        center      : null,     // Microsoft.Maps.Location,
-        centerOffset: null,     // Microsoft.Maps.Point,
-        heading     : 0,
-        labelOverlay: null,     // Microsoft.Maps.LabelOverlay,
-        mapTypeId   : null,     // Microsoft.Maps.MapTypeId.aerial,
-        padding     : 0,
-        zoom        : 10
-    });
-
-    //  http://msdn.microsoft.com/en-us/library/gg427603.aspx
-    BMapOptions = Object.create({
-        backgroundColor     : Microsoft.Maps.Color, //a,r,g,b
-        credentials         : null,
-        customizeOverlays   : false,
-        disableBirdseye     : false,
-        disableKeyboardInput: false,
-        disableMouseInput   : false,
-        disablePanning      : false,
-        disableTouchInput   : false,
-        DisableUserInput    : false,
-        disableZooming      : false,
-        enableClickableLogo : true,
-        enableSearchLogo    : true,
-        fixedMapPosition    : false,
-        height              : null, // must have width as well
-        inertialIntensity   : 0.85,
-        showBreadCrumb      : false,
-        showCopyright       : true,
-        showDashboard       : true,
-        showMapTypeSelector : true,
-        showScalebar        : true,
-        theme               : null, //'Microsoft.Maps.Themes.BingThemes', //   module?
-        tileBuffer          : 0,
-        userIntertia        : true,
-        width               : null
-    });
-
-    return BMap;
+    return BMapsMap;
 })();
-BMaps.location = (function() {
-    var userLocation;
+BMaps.Location = (function() {
+    
+    function BMapsLocation(root) {
+        this._root = root;
 
-    function geoPositionSuccessHandler(pos) {
-        userLocation = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-        BMaps.trigger('location:currentLocation', userLocation);
-    }
-
-    function geoPositionErrorHandler() {
-
-    }
-
-    function currentLocation() {
-        if(navigator.geolocation) {
-            if(!userLocation) {
-                navigator.geolocation.getCurrentPosition(geoPositionSuccessHandler, geoPositionErrorHandler);
-                return false;
-            }
-            else {
-                return userLocation;
-            }
-        }
-    }
-
-    function BMapsLocation(inst) {
         this.map = function() {
-            return inst;
+            var map = this._root;
+            while(map._root) map = map._root;
+            return map;
         };
+
+        return this;
     }
 
     BMapsLocation.prototype = Object.create({
-        currentLocation: function() {
-            return BMaps.utils.location(userLocation);
+        _mixWith: ['BMapsView', 'BMapsPin', 'BMapsDirections'],
+
+        _coords: { lat: 0.0, lon: 0.0 },
+
+        current: function() {
+            if(!this._coords.lat && !this._coords.lon) return this;
+            return new Microsoft.Maps.Location(this._coords.lat, this._coords.lon);
         },
 
-        centerOnUserLocation: function(coords) {
-            if(!currentLocation()) {
-                BMaps.one('location:currentLocation', this.centerOnUserLocation, this);
+        geocode: function() {
+
+        },
+
+        geolocation: function() {
+            if(navigator.geolocation) {
+                this._gettingLocation = true;
+                navigator.geolocation.getCurrentPosition(
+                        BMapsLocation.geolocationSuccessHandler(this), 
+                            BMapsLocation.geolocationErrorHandler(this));
             }
-            else {
-                this.map().view({
-                    center  : BMaps.utils.location(coords),
-                    zoom    : 13
-                });
-            }
+
             return this;
+        },
+
+        set: function() {
+
+        },
+
+        get: function() {
+            return this._coords;
         }
     });
 
-    BMaps.utils.allowMixins(BMapsLocation);
+    BMapsLocation.geolocationSuccessHandler = function(scope) {
+        return function(pos) {
+            scope._coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+            scope._gettingLocation = false;
+            BMaps.trigger('location:geolocation', scope);
+            return true;
+        };
+    };
 
-    BMaps.map.mixin({
-        location: function() {
-            if(!this._location) this._location = new BMapsLocation(this);
-            return this._location;
-        }
-    });
+    BMapsLocation.geolocationErrorHandler = function(scope) {
+        return function(coords) {
+            return false;
+        };
+    };
 
     return BMapsLocation;
 })();
-BMaps.directions = (function() {
-    var BDirections, BWaypoint, BWaypointOptions,
-        defaults = BMaps.utils.defaults,
-        directions = [];
+BMaps.Pin = (function() {
 
-    BWaypoint = Object.create({
-        options: {
-            address                 : null,
-            disambiguationContainer : null,     // DOM Element for directions
-            exactLocation           : false,
-            isViapoint              : false,
-            location                : null,
-            pushpin                 : null,
-            shortAddress            : null
-        }
-    });
-
-    function BMapsDirections(inst) {
-        this.location = function() {
-            return inst;
-        };
+    function BMapsPin(root) {
+        this._root = root;
 
         this.map = function() {
-            return inst.map();
+            var map = this._root;
+            while(map._root) map = map._root;
+            return map;
+        };
+
+        if(this._root._location && this._mixWith.indexOf('BMapsLocation')) this._location = this._root._location;
+    }
+
+    BMapsPin.prototype = Object.create({
+        _mixWith: ['BMapsView', 'BMapsLocation', 'BMapsDirections'],
+
+        add: function(options) {
+            options = options || {};
+            var location = this.location();
+
+            if(location.get().lat && location.get().lon) {
+                this.map()._mapInstance.entities.push( new Microsoft.Maps.Pushpin(location.current(), {visible: true}) );
+            }
+            else {
+                BMaps.one('location:geolocation', this.add, this);
+            }
+
+            return this;
+        },
+
+        get: function(i) {
+            if(!i) return this.map().entities;
+            this.map().entities.get(i);
+
+            return this;
+        },
+
+        show: function(i) {
+            var entities = this.map().entities;
+            if(!i) {
+                for(i = 0; i < entities.length; i++) entities.get(i).setOptions({visible: true});
+            }
+            else {
+                entities.get(i).setOptions({visible: true});
+            }
+
+            return this;
+        },
+
+        hide: function(i) {
+            var entities = this.map().entities;
+            if(!i) {
+                for(i = 0; i < entities.length; i++) entities.get(i).setOptions({visible: false});
+            }
+            else {
+                entities.get(i).setOptions({visible: false});
+            }
+
+            return this;
+        },
+
+        remove: function(i) {
+            var entities = this.map().entities;
+            if(!i) {
+                entities.clear();
+            }
+            else {
+                entities.removeAt(i);
+            }
+
+            return this;
+        }
+    });
+    
+    return BMapsPin;
+})();
+BMaps.Directions = (function() {
+    function BMapsDirections() {
+        this._root = root;
+
+        this.map = function() {
+            var map = this._root;
+            while(map._root) map = map._root;
+            return map;
         };
     }
 
     BMapsDirections.prototype = Object.create({
-        to: function(to) {
-            var directionsModule = BMaps.modules.get('directions');
+        _mixWith: ['BMapsLocation', 'BMapsPin'],
 
-            if(!directionsModule) {
-                var self = this;
-                BMaps.one('modules:loaded', function() { self.to.call(self, to) }, this);
-                return this;
-            }
-            
-            if(!this.manager) this.manager = new Microsoft.Maps.Directions.DirectionsManager( this.map().map );
+        to: function(toAddress) {
+            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map());
+            this._manager.addWaypoint({ location: this.location().get() });
+            this._manager.addWaypoint({ address: toAddress });
+        },
 
-            this.manager.addWaypoint( new Microsoft.Maps.Directions.Waypoint( defaults({ location: this.location().currentLocation() }, BWaypoint.options) ) );
-            this.manager.addWaypoint( new Microsoft.Maps.Directions.Waypoint( defaults({ address: to }, BWaypoint.options) ) );
-            this.manager.calculateDirections();
-            return this;
-        }
-    });
-
-    BMaps.location.mixin({
-        directions: function() {
-            if(!this._directions) this._directions = new BMapsDirections(this);
-            return this._directions;
+        from: function(fromAddress) {
+            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map());
+            this._manager.addWaypoint({ address: fromAddress });
+            this._manager.addWaypoint({ location: this.location().get() });
         }
     });
 
     return BMapsDirections;
+})();
+BMaps.View = (function() {
+    var defaults = BMaps.Utils.defaults;
+
+    function BMapsView(root) {
+        this._root = root;
+
+        this.map = function() {
+            var map = this._root;
+            while(map._root) map = map._root;
+            return map;
+        };
+
+        return this;
+    }
+
+    BMapsView.prototype = Object.create({
+        _mixWith: ['BMapsMap', 'BMapsPin', 'BMapsLocation', 'BMapsDirections'],
+
+        center: function() {
+            var location = this.location();
+            if(location.get().lat && location.get().lon) {
+                this.map()._mapInstance.setView( defaults({ center: location.current(), zoom: 13 }) );
+            }
+        }
+    });
+
+    return BMapsView;
+})();
+BMaps = (function() {
+    var modules = {
+        BMapsPin        : BMaps.Pin,
+        BMapsLocation   : BMaps.Location,
+        BMapsDirections : BMaps.Directions,
+        BMapsMap        : BMaps.Map,
+        BMapsView       : BMaps.View
+    };
+
+    function onMixin(to, moduleName) {
+        var shortName = moduleName.match(/BMaps(\w+)/).pop().toLowerCase();
+
+        to.prototype[shortName] = function() {
+            if(!this['_' + shortName]) {
+                this['_' + shortName] = new modules[moduleName](this);
+                if(this._mixWith && ~this._mixWith.indexOf(moduleName)) {
+                    var name = to.toString().match(/BMaps(\w+)/).pop().toLowerCase();
+                    this['_' + shortName]['_' + name] = this;
+                }
+            }
+
+            return this['_' + shortName];
+        }
+    }
+
+    for(var c in modules) {
+        var module = modules[c];
+        for(var m in module.prototype._mixWith) {
+            var mixTo   = modules[module.prototype._mixWith[m]];
+            onMixin(mixTo, c);
+        }
+    }
+
+    BMaps.Events.eventable(BMaps);
+
+    return BMaps;
 })();

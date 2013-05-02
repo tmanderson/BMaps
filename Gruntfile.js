@@ -3,13 +3,13 @@ module.exports = function(grunt) {
         pkg: grunt.file.readJSON('package.json'),
 
         src: {
-            files: ['src/main.js', 'src/utils.js', 'src/events.js', 'src/modules.js', 'src/map.js', 'src/poi.js', 'src/geolocate.js', 'src/display.js', 'src/directions.js'],
-            dev  : ['src/main.js', 'src/utils.js', 'src/events.js', 'src/modules.js', 'src/map.js', 'src/location.js', 'src/directions.js']
+            files: ['src/Options.js', 'src/Utils.js', 'src/Events.js', 'src/Map.js', 'src/Location.js', 'src/Pin.js', 'src/Directions.js', 'src/View.js', 'src/BMaps.js']
         },
 
         concat: {
             main: {
                 options: {
+                    banner: 'BMaps = {}\n',
                     separator: '\n'
                 },
                 src: '<%= src.files %>',
@@ -18,16 +18,10 @@ module.exports = function(grunt) {
 
             test: {
                 options: {
+                    banner: 'BMaps = {}\n',
                     separator: '\n'
                 },
                 src: '<%= src.files %>',
-                dest: 'test/src/bmaps.js'
-            },
-            dev: {
-                options: {
-                    separator: '\n'
-                },
-                src: '<%= src.dev %>',
                 dest: 'test/src/bmaps.js'
             }
         },
