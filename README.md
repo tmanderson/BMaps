@@ -1,5 +1,5 @@
 # BMaps
-**An easier way to interact with the Bing Maps APIs**
+**So you won't have to deal with the Bing Maps API documentation**
 
 ## Getting started
 ```JavaScript
