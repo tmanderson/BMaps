@@ -1,0 +1,31 @@
+{
+  "name": "BMaps",
+  "version": "0.0.1",
+  "description": "So you won't have to deal with Bing's documentation",
+  "devDependencies": {
+    "grunt": "~0.4.1",
+    "grunt-contrib-concat": "~0.3.0",
+    "grunt-contrib-uglify": "~0.2.0",
+    "grunt-contrib-watch" : "~0.3.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/tmanderson/BMaps.git"
+  },
+  "keywords": [
+    "bing",
+    "maps",
+    "bing",
+    "maps",
+    "browser",
+    "web",
+    "browser",
+    "bing",
+    "api"
+  ],
+  "author": "Mitch Anderson",
+  "license": "BSD"
+}
