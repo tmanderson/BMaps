@@ -23,6 +23,8 @@ BMaps = (function() {
                 }
             }
 
+            if(this.promise) instance.promise = this.promise;
+
             return instance;
         }
     }

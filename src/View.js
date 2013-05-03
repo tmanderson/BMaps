@@ -21,7 +21,7 @@ BMaps.View = (function() {
             if(location.get().lat && location.get().lon) {
                 this.map().get().setView( defaults({ center: location.current(), zoom: 13 }) );
             }
-            return this;    
+            return this;
         },
 
         zoom: function() {

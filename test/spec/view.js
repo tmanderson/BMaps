@@ -31,7 +31,7 @@ describe("BMapsView Module", function() {
 
     it("Should center on user location via center", function() {
         runs(function() {
-            map.view().location().geolocate().view().center();
+            map.view().location().geolocate().geocode(map.view().center);
         });
 
         waitsFor(function() {

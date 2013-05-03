@@ -7,6 +7,8 @@ BMaps.Directions = (function() {
             while(map._root) map = map._root;
             return map;
         };
+
+        this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map()._mapInstance);
     }
 
     BMapsDirections.prototype = Object.create({
@@ -33,7 +35,6 @@ BMaps.Directions = (function() {
 
         to: function(toAddress) {
             this._lastDir = 'to';
-            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map()._mapInstance);
             this._manager.resetDirections();
             this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ location: this.location().current() }));
             this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ address: toAddress }));
@@ -43,7 +44,6 @@ BMaps.Directions = (function() {
 
         from: function(fromAddress) {
             this._lastDir = 'from';
-            if(!this._manager) this._manager = new Microsoft.Maps.Directions.DirectionsManager(this.map()._mapInstance);
             this._manager.resetDirections();
             this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ address: fromAddress }));
             this._manager.addWaypoint(new Microsoft.Maps.Directions.Waypoint({ location: this.location().current() }));

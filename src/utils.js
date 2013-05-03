@@ -91,47 +91,6 @@ BMaps.Utils = (function() {
                     };
                 }
             }
-        },
-
-        promise: function(obj, rootCall) {
-
-            function Promise(root, rootFn) {
-                var self = this;
-                this.resolutions = [];
-                this.createProxies(root);
-
-                return this;
-            }
-
-            Promise.prototype = Object.create({
-                createProxies: function(obj) {
-                    var self = this;
-                    
-                    for(var p in obj) {
-                        if(/function/ig.test(obj[p].toString())) {
-                            self[p] = (function(name, called) {
-                                return function() {
-                                    var result = called.apply(obj, arguments);
-                                    self.resolutions.push({ scope: obj, method: name, args: arguments });
-                                    self.createProxies(result);
-                                    return self;
-                                }
-                            })(p, obj[p]);
-                        }
-                    }
-                },
-
-                resolve: function() {
-                    var scope = null;
-                    
-                    while(this.resolutions.length) {
-                        var reso = this.resolutions.shift();
-                        reso.scope[reso.method].apply(reso.scope, reso.args);
-                    }
-                }
-            });
-
-            return new Promise(obj, rootCall);
         }
     });
 
