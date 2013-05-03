@@ -162,50 +162,37 @@ BMaps.Utils = (function() {
         promise: function(obj, rootCall) {
 
             function Promise(root, rootFn) {
-                this.overrideProps(root);
-                this.resolutions = [{ scope: root, method: null, args: [] }];
+                var self = this;
+                this.resolutions = [];
+                this.createProxies(root);
+
                 return this;
             }
 
             Promise.prototype = Object.create({
+                createProxies: function(obj) {
+                    var self = this;
+                    
+                    for(var p in obj) {
+                        if(/function/ig.test(obj[p].toString())) {
+                            self[p] = (function(name, called) {
+                                return function() {
+                                    var result = called.apply(obj, arguments);
+                                    self.resolutions.push({ scope: obj, method: name, args: arguments });
+                                    self.createProxies(result);
+                                    return self;
+                                }
+                            })(p, obj[p]);
+                        }
+                    }
+                },
+
                 resolve: function() {
                     var scope = null;
-
-                    for(var p in this.resolutions) {
-                        var reso = this.resolutions[p];
-                        if(!reso.method) continue;
-                        console.log(reso);
+                    
+                    while(this.resolutions.length) {
+                        var reso = this.resolutions.shift();
                         reso.scope[reso.method].apply(reso.scope, reso.args);
-                        // else if(scope && reso.method) {
-                        //     scope = scope[reso.method].apply(scope, reso.args);
-                        // }
-
-                        // console.log(reso.scope || scope, reso.method);
-                    }
-                },
-
-                overrideProps: function(obj) {
-                    var self = this;
-
-                    for(var p in obj) {
-                        if(/function/ig.test(typeof obj[p])) {
-                            this[p] = self.nextPromise(obj, p, obj[p], self);
-                        }
-                        else {
-                            this[p] = function() {
-                                return self;
-                            }
-                        }
-                    }
-                },
-
-                nextPromise: function(scope, prop, exp, p) {
-                    return function() {
-                        var newScope = exp.apply(scope, arguments);
-                        p.overrideProps(newScope);
-                        p.resolutions[p.resolutions.length-1].method = prop;
-                        p.resolutions.push({ scope: newScope, method: null, args: arguments });
-                        return p;
                     }
                 }
             });
@@ -288,17 +275,33 @@ BMaps.Events = (function() {
     return BMapsEvents;
 })();
 BMaps.Map = (function() {
-    function BMapsMap() {
+    function BMapsMap(el, options) {
+        options = options || {};
+
         var defaults = BMaps.Utils.defaults;
-        options = arguments[1] || {};
-        if(!options.key) options.credentials = BMaps.key;
-        this._mapInstance = new Microsoft.Maps.Map(options.el || document.body, defaults(options, BMaps.Options.Map, true));
+
+        if(el && !('nodeType' in el) && /object/i.test(typeof el)) {
+            options = el;
+            el = options.el || null;
+        }
+
+        if(!options.key && BMaps.key) options.credentials = BMaps.key;
+
+        this._mapInstance = new Microsoft.Maps.Map(el || document.body, defaults(options, BMaps.Options.Map, true));
 
         return this;
     }
 
     BMapsMap.prototype = Object.create({
-        _reference: ['BMapsView']
+        _reference: ['BMapsView'],
+
+        get: function() {
+            return this._mapInstance;
+        },
+
+        destroy: function() {
+            this._mapInstance.dispose();
+        }
     });
 
     return BMapsMap;
@@ -525,13 +528,13 @@ BMaps.View = (function() {
         center: function() {
             var location = this.location();
             if(location.get().lat && location.get().lon) {
-                this.map()._mapInstance.setView( defaults({ center: location.current(), zoom: 13 }) );
+                this.map().get().setView( defaults({ center: location.current(), zoom: 13 }) );
             }
             return this;    
         },
 
         zoom: function() {
-            this.map()._mapInstance.setView( defaults({ zoom: arguments[0] }) );
+            this.map().get().setView( defaults({ zoom: arguments[0] }, BMaps.Options.MapView) );
             return this;
         }
     });
