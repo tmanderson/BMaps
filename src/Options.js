@@ -2,6 +2,7 @@ BMaps.Options = Object.create({
     Map: {
         backgroundColor     : Microsoft.Maps.Color, //a,r,g,b
         credentials         : null,
+        center              : null,
         customizeOverlays   : false,
         disableBirdseye     : false,
         disableKeyboardInput: false,
@@ -23,7 +24,9 @@ BMaps.Options = Object.create({
         theme               : null, //'Microsoft.Maps.Themes.BingThemes', //   module?
         tileBuffer          : 0,
         userIntertia        : true,
-        width               : null
+        width               : null,
+        animate             : true,
+        zoom                : 10
     },
 
     MapView: {

@@ -16,23 +16,22 @@ BMaps.POI = (function() {
         _reference: ['BMapsMap', 'BMapsPin', 'BMapsLocation'],
         _results: [],
 
-        get: function() {
+        get: function(cb) {
             var location = this.location();
 
             if(location.get().lat && location.get().lon && !this._results.length) {
-                var self    = this,
-                    promise = BMaps.Utils.promise(this);
+                var self    = this;
 
                 BMapsPOI.getPOIs({
                     lat     : location.get().lat,
                     lon     : location.get().lon,
                     callback: function(data) {
                         self._results = data;
-                        promise.resolve();
+                        if(cb) cb(data);
                     }
                 });
 
-                return promise;
+                return this;
             }
             else {
                 return this._results;

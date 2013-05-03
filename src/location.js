@@ -64,8 +64,9 @@ BMaps.Location = (function() {
             return this._address;
         },
 
-        set: function() {
-
+        set: function(lat, lon) {
+            this._coords = { lat: lat, lon: lon };
+            return this;
         },
 
         get: function() {
